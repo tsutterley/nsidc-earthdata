@@ -5,7 +5,7 @@ nsidc-earthdata
 
 - [NASA Earthdata Login system](https://urs.earthdata.nasa.gov)  
 - [How to Access Data with Python](https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+Python)  
-- [NSIDC: what options are available](https://nsidc.org/support/faq/what-options-are-available-bulk-downloading-data-https-earthdata-login-enabled)  
+- [NSIDC: what download options are available](https://nsidc.org/support/faq/what-options-are-available-bulk-downloading-data-https-earthdata-login-enabled)  
 
 Register with NASA Earthdata Login system and add **NSIDC_DATAPOOL_OPS** to your NASA Earthdata Applications
 
@@ -29,7 +29,25 @@ Welcome to n5eil01u.ecs.nsidc.org
 `rsync`: Recursively sync all directories with a local directory  
 `mget`: Get all files in directory  
 `get`: Get a single file in a directory  
+`quiet`: Turn off verbose output  
 `exit`: Exit program  
+
+#### Examples
+##### Recursively sync two directories
+```
+> cd ILATM2.002
+> rsync 2016.11.17 2016.11.18
+```
+##### Retrieve everything from a directory
+```
+> cd ILATM2.002/2016.11.17
+> mget
+```
+##### Retrieve a single file from a directory
+```
+> cd ILATM2.002/2016.11.17
+> get ILATM2_20161117_160929_smooth_nadir3seg_50pt.csv
+```
 
 #### Dependencies
 [lxml: processing XML and HTML in Python](https://pypi.python.org/pypi/lxml)

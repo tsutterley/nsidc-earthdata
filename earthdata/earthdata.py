@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (08/2017)
+Written by Tyler Sutterley (09/2017)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -15,6 +15,7 @@ COMMAND LINE OPTIONS:
 	rsync: Recursively sync all directories with a local directory
 	mget: Get all files in directory
 	get: Get a single file in a directory
+	quiet: Turn off verbose output
 	exit: Exit program
 
 PYTHON DEPENDENCIES:
@@ -23,6 +24,7 @@ PYTHON DEPENDENCIES:
 		https://github.com/lxml/lxml
 
 UPDATE HISTORY:
+	Updated 09/2017: added option quiet to turn off verbose output. cd to root
 	Written 08/2017
 """
 from __future__ import print_function
@@ -45,10 +47,12 @@ class earthdata(object):
 		self.intro = 'Welcome to {0}'.format(self.host)
 		self.goodbye = 'Goodbye!'
 		#-- remote https server for IceBridge Data (can cd to ../PRE_OIB)
-		self.remote_directory = '{0}/{1}'.format(self.host,"ICEBRIDGE")
+		self.remote_directory = posixpath.join(self.host,"ICEBRIDGE")
 		self.local_directory = os.getcwd()
 		#-- flag to keep while loop running
 		self.run = True
+		#-- verbosity settings
+		self.verbose = True
 		#-- permissions mode of the local directories and files (in octal)
 		self.mode = 0775
 		#-- compile HTML parser for lxml
@@ -65,6 +69,7 @@ class earthdata(object):
 		functions['rsync'] = self.rsync_directories
 		functions['mget'] = self.mget_files
 		functions['get'] = self.get_file
+		functions['quiet'] = self.set_verbosity
 		functions['exit'] = self.exit_program
 		#-- create https opener for NASA Earthdata using supplied credentials
 		self.https_opener(USER,PASSWORD)
@@ -134,6 +139,7 @@ class earthdata(object):
 		print(' rsync\tRecursively sync all directories with a local directory')
 		print(' mget\tGet all files in directory')
 		print(' get\tGet a single file in a directory')
+		print(' quiet\tTurn off verbose output')
 		print(' exit\tExit program\n')
 
 	#-- PURPOSE: list everything in directory
@@ -170,8 +176,11 @@ class earthdata(object):
 
 	#-- PURPOSE: change the remote directory
 	def change_remote_directory(self, args):
-		#-- change to parent directory or to the argument passed
-		RD = posixpath.normpath(posixpath.join(self.remote_directory,args[0]))
+		if args:
+			#-- change to parent directory or to the argument passed
+			RD=posixpath.normpath(posixpath.join(self.remote_directory,args[0]))
+		else:
+			RD=posixpath.join(self.host,"ICEBRIDGE")
 		#-- attempt to connect to new remote directory
 		try:
 			urllib2.urlopen('https://{0}'.format(RD),timeout=20)
@@ -181,7 +190,9 @@ class earthdata(object):
 		else:
 			#-- set the new remote directory and print prompt
 			self.remote_directory = RD
-			print('Directory changed to\n\t{0}{1}\n'.format('https://',RD))
+			#-- print that command was success if verbose output
+			if self.verbose:
+				print('Directory changed to\n\t{0}{1}\n'.format('https://',RD))
 
 	#-- PURPOSE: change the local directory and make sure it exists
 	def change_local_directory(self, args):
@@ -190,7 +201,9 @@ class earthdata(object):
 		#-- create new local directory if it did not presently exist
 		if not os.path.exists(self.local_directory):
 			os.makedirs(self.local_directory,self.mode)
-		print('Local directory changed to\n\t{0}\n'.format(self.local_directory))
+		#-- print that command was success if verbose output
+		if self.verbose:
+			print('Local directory changed to\n\t{0}\n'.format(self.local_directory))
 
 	#-- PURPOSE: create a set of directories within the local directory
 	def make_local_directories(self, args):
@@ -357,9 +370,10 @@ class earthdata(object):
 			OVERWRITE = ' (new)'
 		#-- if file does not exist locally, is to be overwritten, or CLOBBER is set
 		if TEST or CLOBBER:
-			#-- Printing files transferred
-			print('{0} --> '.format(self.remote_file))
-			print('\t{0}{1}\n'.format(self.local_file,OVERWRITE))
+			#-- Printing files transferred if verbose output
+			if self.verbose:
+				print('{0} --> '.format(self.remote_file))
+				print('\t{0}{1}\n'.format(self.local_file,OVERWRITE))
 			#-- Create and submit request. There are a wide range of exceptions
 			#-- that can be thrown here, including HTTPError and URLError.
 			request = urllib2.Request(self.remote_file)
@@ -376,6 +390,10 @@ class earthdata(object):
 			os.chmod(self.local_file, self.mode)
 			#-- close request
 			request = None
+
+	#-- PURPOSE: set the verbosity level of the program
+	def set_verbosity(self, *kwargs):
+		self.verbose = False
 
 	#-- PURPOSE: exit the while loop to end the program
 	def exit_program(self, *kwargs):

@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 u"""
 nsidc_earthdata.py
-Written by Tyler Sutterley (08/2017)
+Written by Tyler Sutterley (09/2017)
 ftp-like program for searching NSIDC databases and retrieving data
+This is a wrapper function for entering credentials and running the program
 
 https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+Python
 https://nsidc.org/support/faq/what-options-are-available-bulk-downloading-data-
@@ -26,6 +27,7 @@ COMMAND LINE OPTIONS:
 	rsync: Recursively sync all directories with a local directory
 	mget: Get all files in directory
 	get: Get a single file in a directory
+	quiet: Turn off verbose output
 	exit: Exit program
 
 PYTHON DEPENDENCIES:
@@ -34,6 +36,7 @@ PYTHON DEPENDENCIES:
 		https://github.com/lxml/lxml
 
 UPDATE HISTORY:
+	Updated 09/2017: updated header text
 	Written 08/2017
 """
 from __future__ import print_function

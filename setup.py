@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 setup(
 	name='nsidc-earthdata',
-	version='1.0.0.0',
+	version='1.0.0.1',
 	description='ftp-like program for searching NSIDC databases and retrieving NASA Operation IceBridge data',
 	url='https://github.com/tsutterley/nsidc-earthdata',
 	author='Tyler Sutterley',
