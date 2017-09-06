@@ -29,7 +29,7 @@ Welcome to n5eil01u.ecs.nsidc.org
 `rsync`: Recursively sync all directories with a local directory  
 `mget`: Get all files in directory  
 `get`: Get a single file in a directory  
-`quiet`: Turn off verbose output  
+`verbose`: Toggle verbose output  
 `exit`: Exit program  
 
 #### Examples

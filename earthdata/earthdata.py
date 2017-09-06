@@ -15,7 +15,7 @@ COMMAND LINE OPTIONS:
 	rsync: Recursively sync all directories with a local directory
 	mget: Get all files in directory
 	get: Get a single file in a directory
-	quiet: Turn off verbose output
+	verbose: Toggle verbose output of program
 	exit: Exit program
 
 PYTHON DEPENDENCIES:
@@ -24,7 +24,7 @@ PYTHON DEPENDENCIES:
 		https://github.com/lxml/lxml
 
 UPDATE HISTORY:
-	Updated 09/2017: added option quiet to turn off verbose output. cd to root
+	Updated 09/2017: added option verbose to toggle verbose output. cd to root
 	Written 08/2017
 """
 from __future__ import print_function
@@ -69,7 +69,7 @@ class earthdata(object):
 		functions['rsync'] = self.rsync_directories
 		functions['mget'] = self.mget_files
 		functions['get'] = self.get_file
-		functions['quiet'] = self.set_verbosity
+		functions['verbose'] = self.set_verbosity
 		functions['exit'] = self.exit_program
 		#-- create https opener for NASA Earthdata using supplied credentials
 		self.https_opener(USER,PASSWORD)
@@ -139,7 +139,7 @@ class earthdata(object):
 		print(' rsync\tRecursively sync all directories with a local directory')
 		print(' mget\tGet all files in directory')
 		print(' get\tGet a single file in a directory')
-		print(' quiet\tTurn off verbose output')
+		print(' verbose\tToggle verbose output of program')
 		print(' exit\tExit program\n')
 
 	#-- PURPOSE: list everything in directory
@@ -393,7 +393,7 @@ class earthdata(object):
 
 	#-- PURPOSE: set the verbosity level of the program
 	def set_verbosity(self, *kwargs):
-		self.verbose = False
+		self.verbose ^= True
 
 	#-- PURPOSE: exit the while loop to end the program
 	def exit_program(self, *kwargs):

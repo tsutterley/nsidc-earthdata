@@ -27,7 +27,7 @@ COMMAND LINE OPTIONS:
 	rsync: Recursively sync all directories with a local directory
 	mget: Get all files in directory
 	get: Get a single file in a directory
-	quiet: Turn off verbose output
+	verbose: Toggle verbose output of program
 	exit: Exit program
 
 PYTHON DEPENDENCIES:
