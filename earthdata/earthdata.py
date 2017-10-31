@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (09/2017)
+Written by Tyler Sutterley (10/2017)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -16,6 +16,7 @@ COMMAND LINE OPTIONS:
 	mget: Get all files in directory
 	get: Get a single file in a directory
 	verbose: Toggle verbose output of program
+	checksum: Toggle checksum function within program
 	exit: Exit program
 
 PYTHON DEPENDENCIES:
@@ -24,6 +25,7 @@ PYTHON DEPENDENCIES:
 		https://github.com/lxml/lxml
 
 UPDATE HISTORY:
+	Updated 10/2017: added checksum comparison function for MD5 and CKSUM
 	Updated 09/2017: added option verbose to toggle verbose output. cd to root
 	Written 08/2017
 """
@@ -33,6 +35,7 @@ import sys
 import os
 import re
 import shutil
+import hashlib
 import lxml.etree
 import posixpath
 import urllib2, cookielib
@@ -53,10 +56,13 @@ class earthdata(object):
 		self.run = True
 		#-- verbosity settings
 		self.verbose = True
+		#-- run checksums for all downloaded data files
+		self.checksums = True
 		#-- permissions mode of the local directories and files (in octal)
 		self.mode = 0775
-		#-- compile HTML parser for lxml
-		self.parser = lxml.etree.HTMLParser()
+		#-- compile HTML and xml parsers for lxml
+		self.htmlparser = lxml.etree.HTMLParser()
+		self.xmlparser = lxml.etree.XMLParser()
 		#-- python dictionary with valid functions
 		functions = {}
 		functions['help'] = self.usage
@@ -70,6 +76,7 @@ class earthdata(object):
 		functions['mget'] = self.mget_files
 		functions['get'] = self.get_file
 		functions['verbose'] = self.set_verbosity
+		functions['checksum'] = self.set_checksums
 		functions['exit'] = self.exit_program
 		#-- create https opener for NASA Earthdata using supplied credentials
 		self.https_opener(USER,PASSWORD)
@@ -130,17 +137,18 @@ class earthdata(object):
 	#-- PURPOSE: help module that lists the commands for the program
 	def usage(self, *kwargs):
 		print('\nHelp: {0}'.format(os.path.basename(sys.argv[0])))
-		print(' ls\tList contents of the remote directory')
-		print(' cd\tChange the remote directory')
-		print(' lcd\tChange the local directory')
-		print(' mkdir\tCreate a directory within the local directory')
-		print(' pwd\tPrint the current local and remote directory paths')
-		print(' sync\tSync all files in directory with a local directory')
-		print(' rsync\tRecursively sync all directories with a local directory')
-		print(' mget\tGet all files in directory')
-		print(' get\tGet a single file in a directory')
+		print(' ls\t\tList contents of the remote directory')
+		print(' cd\t\tChange the remote directory')
+		print(' lcd\t\tChange the local directory')
+		print(' mkdir\t\tCreate a directory within the local directory')
+		print(' pwd\t\tPrint the current local and remote directory paths')
+		print(' sync\t\tSync all files in directory with a local directory')
+		print(' rsync\t\tRecursively sync all directories with a local directory')
+		print(' mget\t\tGet all files in directory')
+		print(' get\t\tGet a single file in a directory')
 		print(' verbose\tToggle verbose output of program')
-		print(' exit\tExit program\n')
+		print(' checksum\tToggle checksum function within program')
+		print(' exit\t\tExit program\n')
 
 	#-- PURPOSE: list everything in directory
 	def list_directory(self, args):
@@ -160,7 +168,7 @@ class earthdata(object):
 					print('ERROR: {0}{1} not a valid path'.format('https://',RD))
 				else:
 					#-- parse response for subdirectories (find column names)
-					tree = lxml.etree.parse(response,self.parser)
+					tree = lxml.etree.parse(response,self.htmlparser)
 					colnames = tree.xpath('//td[@class="indexcolname"]//a/@href')
 					print('\n'.join([w for w in colnames]))
 		else:
@@ -168,7 +176,7 @@ class earthdata(object):
 			remote_path = ('https://',self.remote_directory)
 			req = urllib2.Request(url='{0}{1}'.format(*remote_path))
 			#-- read and parse request for subdirectories (find column names)
-			tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.parser)
+			tree=lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 			colnames = tree.xpath('//td[@class="indexcolname"]//a/@href')
 			print('\n'.join([w for w in colnames]))
 		#-- close the request
@@ -227,7 +235,7 @@ class earthdata(object):
 		#-- submit request
 		req = urllib2.Request(url='{0}{1}'.format('https://',remote_dir))
 		#-- read and parse request for remote files (columns and dates)
-		tree = lxml.etree.parse(urllib2.urlopen(req, timeout=20), self.parser)
+		tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 		colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
 		collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
 		#-- regular expression pattern
@@ -241,6 +249,12 @@ class earthdata(object):
 			#-- remote and local versions of the file
 			self.remote_file='{0}{1}/{2}'.format('https://',remote_dir,colnames[i])
 			self.local_file = os.path.join(local_dir,colnames[i])
+			#-- create regular expression pattern for finding xml files
+			if self.checksums:
+				fileBasename,fileExtension = os.path.splitext(colnames[i])
+				regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
+				xml, = [f for f in colnames if re.match(regex_pattern,f)]
+				self.remote_xml='{0}{1}/{2}'.format('https://',remote_dir,xml)
 			#-- get last modified date and convert into unix time
 			Y,M,D,H,MN = [int(v) for v in R2.findall(collastmod[i]).pop()]
 			self.remote_mtime = calendar.timegm((Y,M,D,H,MN,0))
@@ -254,7 +268,7 @@ class earthdata(object):
 		#-- submit request
 		req=urllib2.Request(url='{0}{1}'.format('https://',self.remote_directory))
 		#-- read and parse request for remote files (columns and dates)
-		tree = lxml.etree.parse(urllib2.urlopen(req, timeout=20), self.parser)
+		tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 		#-- regular expression pattern
 		R1 = '(' + '|'.join(args) + ')' if args else "^(?!Parent)"
 		colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
@@ -271,7 +285,7 @@ class earthdata(object):
 			#-- submit request
 			req = urllib2.Request(url=remote_dir)
 			#-- read and parse request for remote files (columns and dates)
-			tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.parser)
+			tree=lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 			colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
 			collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
 			remote_file_lines = [i for i,f in enumerate(colnames) if
@@ -281,6 +295,12 @@ class earthdata(object):
 				#-- remote and local versions of the file
 				self.remote_file='{0}/{1}'.format(remote_dir,colnames[i])
 				self.local_file = os.path.join(local_dir,colnames[i])
+				#-- create regular expression pattern for finding xml files
+				if self.checksums:
+					fileBasename,fileExtension = os.path.splitext(colnames[i])
+					regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
+					xml, = [f for f in colnames if re.match(regex_pattern,f)]
+					self.remote_xml='{0}{1}/{2}'.format('https://',remote_dir,xml)
 				#-- get last modified date and convert into unix time
 				Y,M,D,H,MN = [int(v) for v in R2.findall(collastmod[i]).pop()]
 				self.remote_mtime = calendar.timegm((Y,M,D,H,MN,0))
@@ -299,7 +319,7 @@ class earthdata(object):
 		#-- submit request
 		req = urllib2.Request(url='{0}{1}'.format('https://',remote_dir))
 		#-- read and parse request for remote files (columns and dates)
-		tree = lxml.etree.parse(urllib2.urlopen(req, timeout=20), self.parser)
+		tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 		colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
 		collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
 		#-- regular expression pattern
@@ -314,6 +334,12 @@ class earthdata(object):
 			#-- remote and local versions of the file
 			self.remote_file='{0}{1}/{2}'.format('https://',remote_dir,colnames[i])
 			self.local_file = os.path.join(local_dir,colnames[i])
+			#-- create regular expression pattern for finding xml files
+			if self.checksums:
+				fileBasename,fileExtension = os.path.splitext(colnames[i])
+				regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
+				xml, = [f for f in colnames if re.match(regex_pattern,f)]
+				self.remote_xml='{0}{1}/{2}'.format('https://',remote_dir,xml)
 			#-- get last modified date and convert into unix time
 			Y,M,D,H,MN = [int(v) for v in R2.findall(collastmod[i]).pop()]
 			self.remote_mtime = calendar.timegm((Y,M,D,H,MN,0))
@@ -332,7 +358,7 @@ class earthdata(object):
 		#-- submit request
 		req = urllib2.Request(url='{0}{1}'.format('https://',remote_dir))
 		#-- read and parse request for remote files (columns and dates)
-		tree = lxml.etree.parse(urllib2.urlopen(req, timeout=20), self.parser)
+		tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 		colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
 		collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
 		regex_pattern = '{0}$'.format(args[0])
@@ -340,6 +366,12 @@ class earthdata(object):
 		#-- remote and local versions of the file
 		self.remote_file = '{0}{1}/{2}'.format('https://',remote_dir,colnames[i])
 		self.local_file = os.path.join(local_dir,colnames[i])
+		#-- create regular expression pattern for finding xml files
+		if self.checksums:
+			fileBasename,fileExtension = os.path.splitext(args[0])
+			regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
+			xml, = [f for f in colnames if re.match(regex_pattern,f)]
+			self.remote_xml='{0}{1}/{2}'.format('https://',remote_dir,xml)
 		#-- compile regular expression operator for extracting modification date
 		date_regex_pattern = '(\d+)\-(\d+)\-(\d+)\s(\d+)\:(\d+)'
 		R2 = re.compile(date_regex_pattern, re.VERBOSE)
@@ -373,7 +405,7 @@ class earthdata(object):
 			#-- Printing files transferred if verbose output
 			if self.verbose:
 				print('{0} --> '.format(self.remote_file))
-				print('\t{0}{1}\n'.format(self.local_file,OVERWRITE))
+				print('\t{0}{1}'.format(self.local_file,OVERWRITE))
 			#-- Create and submit request. There are a wide range of exceptions
 			#-- that can be thrown here, including HTTPError and URLError.
 			request = urllib2.Request(self.remote_file)
@@ -388,12 +420,70 @@ class earthdata(object):
 			os.utime(self.local_file, (os.stat(self.local_file).st_atime,
 				self.remote_mtime))
 			os.chmod(self.local_file, self.mode)
+			#-- run compare checksum program for data files (and not .xml files)
+			self.compare_checksum() if self.checksums else None
+			print()
 			#-- close request
 			request = None
+
+	#-- PURPOSE: compare the checksum in the remote xml file with the local hash
+	def compare_checksum(self, *kwargs):
+		#-- read and parse remote xml file
+		req = urllib2.Request(self.remote_xml)
+		tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.xmlparser)
+		filename, = tree.xpath('//DataFileContainer/DistributedFileName/text()')
+		#-- if the DistributedFileName matches the synced filename
+		if (os.path.basename(self.local_file) == filename):
+			#-- extract checksum and checksum type of the remote file
+			checksum_type, = tree.xpath('//DataFileContainer/ChecksumType/text()')
+			remote_hash, = tree.xpath('//DataFileContainer/Checksum/text()')
+			#-- calculate checksum of local file
+			local_hash = self.get_checksum(checksum_type)
+			#-- compare local and remote checksums to validate data transfer
+			if (local_hash != remote_hash):
+				if self.verbose:
+					print('Remote checksum: {0}'.format(remote_hash))
+					print('Local checksum: {0}' .format(local_hash))
+				raise Exception('Checksum verification failed')
+			elif (local_hash == remote_hash) and self.verbose:
+				print('{0} checksum match: {1}'.format(checksum_type,local_hash))
+
+	#-- PURPOSE: generate checksum hash from a local file for a checksum type
+	#-- supplied hashes within NSIDC *.xml files can currently be MD5 and CKSUM
+	#-- https://nsidc.org/data/icebridge/provider_info.html
+	def get_checksum(self, checksum_type):
+		#-- read the input file to get file information
+		fd = os.open(self.local_file, os.O_RDONLY)
+		n = os.fstat(fd).st_size
+		#-- open the filename in binary read mode
+		file_buffer = os.fdopen(fd, 'rb').read()
+		#-- generate checksum hash for a given type
+		if (checksum_type == 'MD5'):
+			return hashlib.md5(file_buffer).hexdigest()
+		elif (checksum_type == 'CKSUM'):
+			crc32_table = []
+			for b in range(0,256):
+				vv = b<<24
+				for i in range(7,-1,-1):
+				    vv = (vv<<1)^0x04c11db7 if (vv & 0x80000000) else (vv<<1)
+				crc32_table.append(vv & 0xffffffff)
+			#-- calculate CKSUM hash with both file length and file buffer
+			i = c = s = 0
+			for c in file_buffer:
+			    s = ((s << 8) & 0xffffffff)^crc32_table[(s >> 24)^ord(c)]
+			while n:
+			    c = n & 0xff
+			    n = n >> 8
+			    s = ((s << 8) & 0xffffffff)^crc32_table[(s >> 24)^c]
+			return str((~s) & 0xffffffff)
 
 	#-- PURPOSE: set the verbosity level of the program
 	def set_verbosity(self, *kwargs):
 		self.verbose ^= True
+
+	#-- PURPOSE: toggle the checksum function within the program
+	def set_checksums(self, *kwargs):
+		self.checksums ^= True
 
 	#-- PURPOSE: exit the while loop to end the program
 	def exit_program(self, *kwargs):

@@ -28,6 +28,7 @@ COMMAND LINE OPTIONS:
 	mget: Get all files in directory
 	get: Get a single file in a directory
 	verbose: Toggle verbose output of program
+	checksum: Toggle checksum function within program
 	exit: Exit program
 
 PYTHON DEPENDENCIES:

@@ -30,6 +30,7 @@ Welcome to n5eil01u.ecs.nsidc.org
 `mget`: Get all files in directory  
 `get`: Get a single file in a directory  
 `verbose`: Toggle verbose output  
+`checksum`: Toggle checksum function  
 `exit`: Exit program  
 
 #### Examples
