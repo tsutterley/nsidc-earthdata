@@ -16,10 +16,16 @@ Username for urs.earthdata.nasa.gov: <username>
 Password for <username>@urs.earthdata.nasa.gov: <password>
 Welcome to n5eil01u.ecs.nsidc.org
 > help
+Documented commands (type help <topic>):
+========================================
+cd        exit  help  ls    mkdir  rsync  usage  
+checksum  get   lcd   mget  pwd    sync   verbose
+> help rsync
+Recursively sync all directories with a local directory
 ```
 
 ##### Function list:
-`help`: Lists the following command line options  
+`usage`: Lists the following command line options  
 `ls`: List contents of the remote directory  
 `cd`: Change the remote directory  
 `lcd`: Change the local directory  

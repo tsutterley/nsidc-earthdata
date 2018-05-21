@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (10/2017)
+Written by Tyler Sutterley (05/2018)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
-	help: List the following command line options
+	usage: List the following command line options
 	ls: List contents of the remote directory
 	cd: Change the remote directory
 	lcd: Change the local directory
@@ -25,16 +25,22 @@ PYTHON DEPENDENCIES:
 		https://github.com/lxml/lxml
 
 UPDATE HISTORY:
+	Updated 05/2018: using python cmd module (line-oriented command interpreter)
+	Updated 11/2017: added checksum comparison function for CRC32
 	Updated 10/2017: added checksum comparison function for MD5 and CKSUM
 	Updated 09/2017: added option verbose to toggle verbose output. cd to root
+	Updated 08/2017: modules and variables shared within a python class
+		earthdata class is entirely self-contained.  Added credential check
 	Written 08/2017
 """
 from __future__ import print_function
 
 import sys
+import cmd
 import os
 import re
 import shutil
+import getpass
 import hashlib
 import lxml.etree
 import posixpath
@@ -42,8 +48,10 @@ import urllib2, cookielib
 import calendar, time
 
 #-- PURPOSE: creates Earthdata class containing the main functions and variables
-class earthdata(object):
-	def __init__(self, USER, PASSWORD, parent=None):
+class earthdata(cmd.Cmd):
+	def __init__(self, parent=None):
+		#-- call constructor of parent class
+		cmd.Cmd.__init__(self)
 		#-- NSIDC host for Pre-Icebridge and IceBridge data
 		self.host = 'n5eil01u.ecs.nsidc.org'
 		self.prompt = '> '
@@ -52,61 +60,35 @@ class earthdata(object):
 		#-- remote https server for IceBridge Data (can cd to ../PRE_OIB)
 		self.remote_directory = posixpath.join(self.host,"ICEBRIDGE")
 		self.local_directory = os.getcwd()
-		#-- flag to keep while loop running
-		self.run = True
 		#-- verbosity settings
 		self.verbose = True
 		#-- run checksums for all downloaded data files
-		self.checksums = True
+		self.checksums = False
 		#-- permissions mode of the local directories and files (in octal)
 		self.mode = 0775
 		#-- compile HTML and xml parsers for lxml
 		self.htmlparser = lxml.etree.HTMLParser()
 		self.xmlparser = lxml.etree.XMLParser()
-		#-- python dictionary with valid functions
-		functions = {}
-		functions['help'] = self.usage
-		functions['ls'] = self.list_directory
-		functions['cd'] = self.change_remote_directory
-		functions['lcd'] = self.change_local_directory
-		functions['mkdir'] = self.make_local_directories
-		functions['pwd'] = self.print_directory_paths
-		functions['sync'] = self.sync_directory
-		functions['rsync'] = self.rsync_directories
-		functions['mget'] = self.mget_files
-		functions['get'] = self.get_file
-		functions['verbose'] = self.set_verbosity
-		functions['checksum'] = self.set_checksums
-		functions['exit'] = self.exit_program
+		#-- enter credentials with password entered securely from the command-line
+		self.get_credentials()
 		#-- create https opener for NASA Earthdata using supplied credentials
-		self.https_opener(USER,PASSWORD)
+		self.https_opener()
 		self.check_credentials()
-		#-- print introductory message
-		print(self.intro)
-		#-- run program until exit or keyboard interrupt
-		try:
-			while self.run:
-				tokens = raw_input(self.prompt).split()
-				command = tokens[0]
-				if command in functions.keys():
-					functions[command](tokens[1:])
-				else:
-					print('ERROR: invalid command <{0}>'.format(command))
-					self.usage()
-		except KeyboardInterrupt:
-		    pass
-		#-- print goodbye message
-		print(self.goodbye)
+
+	#-- PURPOSE: get the username and password for NASA Earthdata login
+	def get_credentials(self):
+		self.user = raw_input('Username for {0}: '.format(self.host))
+		self.password = getpass.getpass('Password for {0}@{1}: '.format(self.user,self.host))
 
 	#-- PURPOSE: "login" to NASA Earthdata with supplied credentials
-	def https_opener(self,USER,PASS):
+	def https_opener(self):
 		#-- https://docs.python.org/2/howto/urllib2.html#id6
 		#-- create a password manager
 		password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
 		#-- Add the username and password for NASA Earthdata Login system
-		password_mgr.add_password(None,'https://urs.earthdata.nasa.gov',USER,PASS)
+		password_mgr.add_password(None,'https://urs.earthdata.nasa.gov',self.user,self.password)
 		#-- Encode username/password for request authorization headers
-		base64_string = urllib2.base64.b64encode('{0}:{1}'.format(USER,PASS))
+		base64_string = urllib2.base64.b64encode('{0}:{1}'.format(self.user,self.password))
 		#-- Create cookie jar for storing cookies. This is used to store and return
 		#-- the session cookie given to use by the data server (otherwise will just
 		#-- keep sending us back to Earthdata Login to authenticate).
@@ -127,15 +109,16 @@ class earthdata(object):
 	#-- PURPOSE: check that entered NASA Earthdata credentials are valid
 	def check_credentials(self):
 		try:
-			remote_path = ('https://',self.remote_directory)
-			request = urllib2.Request(url='{0}{1}'.format(*remote_path))
+			remote_path = posixpath.join('https://',self.remote_directory)
+			request = urllib2.Request(url=remote_path)
 			response = urllib2.urlopen(request, timeout=20)
 		except urllib2.HTTPError:
 			print('AUTHENTICATION ERROR: check your NASA Earthdata credentials')
 			sys.exit()
 
 	#-- PURPOSE: help module that lists the commands for the program
-	def usage(self, *kwargs):
+	def do_usage(self, *kwargs):
+		"""Help module that lists all commands for the program"""
 		print('\nHelp: {0}'.format(os.path.basename(sys.argv[0])))
 		print(' ls\t\tList contents of the remote directory')
 		print(' cd\t\tChange the remote directory')
@@ -151,21 +134,23 @@ class earthdata(object):
 		print(' exit\t\tExit program\n')
 
 	#-- PURPOSE: list everything in directory
-	def list_directory(self, args):
+	def do_ls(self, args):
+		"""List contents of the remote directory"""
 		#-- print either:
 		#-- 1) everything within the directories of each argument passed
 		#-- 2) everything within the current directory
 		if args:
 			#-- for each argument
-			for a in args:
+			for a in args.split():
 				#-- print contents from remote subdirectories
 				RD = posixpath.normpath(posixpath.join(self.remote_directory,a))
-				req = urllib2.Request(url='{0}{1}'.format('https://',RD))
+				remote_path = posixpath.join('https://',RD)
+				req = urllib2.Request(url=remote_path)
 				try:
 					response = urllib2.urlopen(req, timeout=20)
 				except urllib2.URLError:
 					#-- print an error if invalid
-					print('ERROR: {0}{1} not a valid path'.format('https://',RD))
+					print('ERROR: {0} not a valid path'.format(remote_path))
 				else:
 					#-- parse response for subdirectories (find column names)
 					tree = lxml.etree.parse(response,self.htmlparser)
@@ -173,8 +158,8 @@ class earthdata(object):
 					print('\n'.join([w for w in colnames]))
 		else:
 			#-- print contents from remote directory
-			remote_path = ('https://',self.remote_directory)
-			req = urllib2.Request(url='{0}{1}'.format(*remote_path))
+			remote_path = posixpath.join('https://',self.remote_directory)
+			req = urllib2.Request(url=remote_path)
 			#-- read and parse request for subdirectories (find column names)
 			tree=lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 			colnames = tree.xpath('//td[@class="indexcolname"]//a/@href')
@@ -183,29 +168,32 @@ class earthdata(object):
 		req = None
 
 	#-- PURPOSE: change the remote directory
-	def change_remote_directory(self, args):
+	def do_cd(self, args):
+		"""Change the remote directory to a new path"""
 		if args:
 			#-- change to parent directory or to the argument passed
-			RD=posixpath.normpath(posixpath.join(self.remote_directory,args[0]))
+			RD=posixpath.normpath(posixpath.join(self.remote_directory,args))
 		else:
 			RD=posixpath.join(self.host,"ICEBRIDGE")
 		#-- attempt to connect to new remote directory
+		remote_path = posixpath.join('https://',RD)
 		try:
-			urllib2.urlopen('https://{0}'.format(RD),timeout=20)
+			urllib2.urlopen(remote_path,timeout=20)
 		except urllib2.URLError:
 			#-- print an error if invalid
-			print('ERROR: {0}{1} not a valid path'.format('https://',RD))
+			print('ERROR: {0} not a valid path'.format(remote_path))
 		else:
 			#-- set the new remote directory and print prompt
 			self.remote_directory = RD
 			#-- print that command was success if verbose output
 			if self.verbose:
-				print('Directory changed to\n\t{0}{1}\n'.format('https://',RD))
+				print('Directory changed to\n\t{0}\n'.format(remote_path))
 
 	#-- PURPOSE: change the local directory and make sure it exists
-	def change_local_directory(self, args):
+	def do_lcd(self, args):
+		"""Change the local directory to a new path"""
 		self.local_directory = os.path.normpath(os.path.join(self.local_directory,
-			os.path.expanduser(args[0])))
+			os.path.expanduser(args)))
 		#-- create new local directory if it did not presently exist
 		if not os.path.exists(self.local_directory):
 			os.makedirs(self.local_directory,self.mode)
@@ -214,32 +202,35 @@ class earthdata(object):
 			print('Local directory changed to\n\t{0}\n'.format(self.local_directory))
 
 	#-- PURPOSE: create a set of directories within the local directory
-	def make_local_directories(self, args):
+	def do_mkdir(self, args):
+		"""Create a directory within the local directory"""
 		#-- for each input argument: create the subdirectory
-		for d in args:
-			LD = os.path.join(self.local_directory,d)
-			os.makedirs(LD,self.mode) if not os.path.exists(LD) else None
+		for d in args.split():
+			local_path = os.path.join(self.local_directory,d)
+			os.makedirs(local_path,self.mode) if not os.path.exists(local_path) else None
 
 	#-- PURPOSE: print the current local and remote directory paths
-	def print_directory_paths(self,*kwargs):
-		print('Remote directory:\t{0}{1}'.format('https://',self.remote_directory))
-		print('Local directory:\t{0}\n'.format(self.local_directory))
+	def do_pwd(self,*kwargs):
+		"""Print the current local and remote directory paths"""
+		d=(posixpath.join('https://',self.remote_directory),self.local_directory)
+		print('Remote directory:\t{0}\nLocal directory:\t{1}\n'.format(*d))
 
 	#-- PURPOSE: sync files in a remote directory to a local directory
-	def sync_directory(self, args):
+	def do_sync(self, args):
+		"""Sync all files in directory with a local directory"""
 		#-- local and remote directories
 		local_dir = self.local_directory
 		remote_dir = self.remote_directory
 		#-- make sure local directory exists
 		os.makedirs(local_dir,self.mode) if not os.path.exists(local_dir) else None
 		#-- submit request
-		req = urllib2.Request(url='{0}{1}'.format('https://',remote_dir))
+		req = urllib2.Request(url=posixpath.join('https://',remote_dir))
 		#-- read and parse request for remote files (columns and dates)
 		tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 		colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
 		collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
 		#-- regular expression pattern
-		R1 = '(' + '|'.join(args) + ')' if args else "^(?!Parent)"
+		R1 = '(' + '|'.join(args.split()) + ')' if args else "^(?!Parent)"
 		remote_file_lines = [i for i,f in enumerate(colnames) if re.match(R1,f)]
 		#-- compile regular expression operator for extracting modification date
 		date_regex_pattern = '(\d+)\-(\d+)\-(\d+)\s(\d+)\:(\d+)'
@@ -247,7 +238,7 @@ class earthdata(object):
 		#-- sync each data file
 		for i in remote_file_lines:
 			#-- remote and local versions of the file
-			self.remote_file='{0}{1}/{2}'.format('https://',remote_dir,colnames[i])
+			self.remote_file = posixpath.join('https://',remote_dir,colnames[i])
 			self.local_file = os.path.join(local_dir,colnames[i])
 			#-- create regular expression pattern for finding xml files
 			if self.checksums:
@@ -264,13 +255,14 @@ class earthdata(object):
 		req = None
 
 	#-- PURPOSE: recursively sync a remote directory to a local directory
-	def rsync_directories(self, args):
+	def do_rsync(self, args):
+		"""Recursively sync all directories with a local directory"""
 		#-- submit request
-		req=urllib2.Request(url='{0}{1}'.format('https://',self.remote_directory))
+		req=urllib2.Request(url=posixpath.join('https://',self.remote_directory))
 		#-- read and parse request for remote files (columns and dates)
 		tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 		#-- regular expression pattern
-		R1 = '(' + '|'.join(args) + ')' if args else "^(?!Parent)"
+		R1 = '(' + '|'.join(args.split()) + ')' if args else "^(?!Parent)"
 		colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
 		subdirectories = [sd for sd in colnames if re.match(R1,sd)]
 		#-- compile regular expression operator for extracting modification date
@@ -279,7 +271,7 @@ class earthdata(object):
 		for sd in subdirectories:
 			#-- local and remote directories
 			local_dir = os.path.join(self.local_directory,sd)
-			remote_dir = '{0}{1}/{2}'.format('https://',self.remote_directory,sd)
+			remote_dir = posixpath.join('https://',self.remote_directory,sd)
 			#-- make sure local directory exists
 			os.makedirs(local_dir,self.mode) if not os.path.exists(local_dir) else None
 			#-- submit request
@@ -293,7 +285,7 @@ class earthdata(object):
 			#-- sync each data file
 			for i in remote_file_lines:
 				#-- remote and local versions of the file
-				self.remote_file='{0}/{1}'.format(remote_dir,colnames[i])
+				self.remote_file = posixpath.join(remote_dir,colnames[i])
 				self.local_file = os.path.join(local_dir,colnames[i])
 				#-- create regular expression pattern for finding xml files
 				if self.checksums:
@@ -310,20 +302,21 @@ class earthdata(object):
 		req = None
 
 	#-- PURPOSE: get files in a remote directory to a local directory
-	def mget_files(self, args):
+	def do_mget(self, args):
+		"""Get all files in directory"""
 		#-- local and remote directories
 		local_dir = self.local_directory
 		remote_dir = self.remote_directory
 		#-- make sure local directory exists
 		os.makedirs(local_dir,self.mode) if not os.path.exists(local_dir) else None
 		#-- submit request
-		req = urllib2.Request(url='{0}{1}'.format('https://',remote_dir))
+		req = urllib2.Request(url=posixpath.join('https://',remote_dir))
 		#-- read and parse request for remote files (columns and dates)
 		tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 		colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
 		collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
 		#-- regular expression pattern
-		regex_pattern = '(' + '|'.join(args) + ')' if args else "^(?!Parent)"
+		regex_pattern = '(' + '|'.join(args.split()) + ')' if args else "^(?!Parent)"
 		remote_file_lines = [i for i,f in enumerate(colnames) if
 			re.match(regex_pattern,f)]
 		#-- compile regular expression operator for extracting modification date
@@ -332,7 +325,7 @@ class earthdata(object):
 		#-- get each data file
 		for i in remote_file_lines:
 			#-- remote and local versions of the file
-			self.remote_file='{0}{1}/{2}'.format('https://',remote_dir,colnames[i])
+			self.remote_file = posixpath.join('https://',remote_dir,colnames[i])
 			self.local_file = os.path.join(local_dir,colnames[i])
 			#-- create regular expression pattern for finding xml files
 			if self.checksums:
@@ -349,7 +342,8 @@ class earthdata(object):
 		req = None
 
 	#-- PURPOSE: get a single file in a remote directory to a local directory
-	def get_file(self, args):
+	def do_get(self, args):
+		"""Get a single file in a directory"""
 		#-- local and remote directories
 		local_dir = self.local_directory
 		remote_dir = self.remote_directory
@@ -361,14 +355,14 @@ class earthdata(object):
 		tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 		colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
 		collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
-		regex_pattern = '{0}$'.format(args[0])
+		regex_pattern = '{0}$'.format(args)
 		i, = [i for i,f in enumerate(colnames) if re.match(regex_pattern,f)]
 		#-- remote and local versions of the file
 		self.remote_file = '{0}{1}/{2}'.format('https://',remote_dir,colnames[i])
 		self.local_file = os.path.join(local_dir,colnames[i])
 		#-- create regular expression pattern for finding xml files
 		if self.checksums:
-			fileBasename,fileExtension = os.path.splitext(args[0])
+			fileBasename,fileExtension = os.path.splitext(args)
 			regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
 			xml, = [f for f in colnames if re.match(regex_pattern,f)]
 			self.remote_xml='{0}{1}/{2}'.format('https://',remote_dir,xml)
@@ -405,7 +399,7 @@ class earthdata(object):
 			#-- Printing files transferred if verbose output
 			if self.verbose:
 				print('{0} --> '.format(self.remote_file))
-				print('\t{0}{1}'.format(self.local_file,OVERWRITE))
+				print('\t{0}{1}\n'.format(self.local_file,OVERWRITE))
 			#-- Create and submit request. There are a wide range of exceptions
 			#-- that can be thrown here, including HTTPError and URLError.
 			request = urllib2.Request(self.remote_file)
@@ -422,7 +416,6 @@ class earthdata(object):
 			os.chmod(self.local_file, self.mode)
 			#-- run compare checksum program for data files (and not .xml files)
 			self.compare_checksum() if self.checksums else None
-			print()
 			#-- close request
 			request = None
 
@@ -476,15 +469,40 @@ class earthdata(object):
 			    n = n >> 8
 			    s = ((s << 8) & 0xffffffff)^crc32_table[(s >> 24)^c]
 			return str((~s) & 0xffffffff)
+		elif (checksum_type == 'CRC32'):
+			crc32_table = []
+			for b in range(256):
+				vv = b
+				for i in range(8):
+				    vv = (vv>>1)^0xedb88320 if (vv & 1) else (vv>>1)
+				crc32_table.append(vv & 0xffffffff)
+			s = 0xffffffff
+			for c in file_buffer:
+			    s = crc32_table[(ord(c) ^ s) & 0xff] ^ (s >> 8)
+			return str((~s) & 0xffffffff)
 
 	#-- PURPOSE: set the verbosity level of the program
-	def set_verbosity(self, *kwargs):
+	def do_verbose(self, *kwargs):
+		"""Toggle verbose output of program"""
 		self.verbose ^= True
 
 	#-- PURPOSE: toggle the checksum function within the program
-	def set_checksums(self, *kwargs):
+	def do_checksum(self, *kwargs):
+		"""Toggle checksum function within program"""
 		self.checksums ^= True
 
 	#-- PURPOSE: exit the while loop to end the program
-	def exit_program(self, *kwargs):
-		self.run = False
+	def do_exit(self, *kwargs):
+		"""Exit program"""
+		return True
+
+#-- run main program
+if __name__ == '__main__':
+	#-- run Earthdata program
+	#-- ftp-like program for searching NSIDC databases and retrieving data
+	prompt = earthdata()
+	#-- print introductory message
+	#-- run program until exit or keyboard interrupt
+	prompt.cmdloop(prompt.intro)
+	#-- print goodbye message
+	print(prompt.goodbye)
