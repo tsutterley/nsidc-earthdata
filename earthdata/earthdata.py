@@ -23,8 +23,11 @@ PYTHON DEPENDENCIES:
 	lxml: Pythonic XML and HTML processing library using libxml2/libxslt
 		http://lxml.de/
 		https://github.com/lxml/lxml
+	future: Compatibility layer between Python 2 and Python 3
+		(http://python-future.org/)
 
 UPDATE HISTORY:
+	Updated 06/2018: using python3 compatible octal and input
 	Updated 05/2018: using python cmd module (line-oriented command interpreter)
 	Updated 11/2017: added checksum comparison function for CRC32
 	Updated 10/2017: added checksum comparison function for MD5 and CKSUM
@@ -42,6 +45,7 @@ import re
 import shutil
 import getpass
 import hashlib
+import builtins
 import lxml.etree
 import posixpath
 import urllib2, cookielib
@@ -65,7 +69,7 @@ class earthdata(cmd.Cmd):
 		#-- run checksums for all downloaded data files
 		self.checksums = False
 		#-- permissions mode of the local directories and files (in octal)
-		self.mode = 0775
+		self.mode = 0o775
 		#-- compile HTML and xml parsers for lxml
 		self.htmlparser = lxml.etree.HTMLParser()
 		self.xmlparser = lxml.etree.XMLParser()
@@ -77,7 +81,7 @@ class earthdata(cmd.Cmd):
 
 	#-- PURPOSE: get the username and password for NASA Earthdata login
 	def get_credentials(self):
-		self.user = raw_input('Username for {0}: '.format(self.host))
+		self.user = builtins.input('Username for {0}: '.format(self.host))
 		self.password = getpass.getpass('Password for {0}@{1}: '.format(self.user,self.host))
 
 	#-- PURPOSE: "login" to NASA Earthdata with supplied credentials
