@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (05/2018)
+Written by Tyler Sutterley (06/2018)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -27,7 +27,7 @@ PYTHON DEPENDENCIES:
 		(http://python-future.org/)
 
 UPDATE HISTORY:
-	Updated 06/2018: using python3 compatible octal and input
+	Updated 06/2018: using python3 compatible octal, input and urllib
 	Updated 05/2018: using python cmd module (line-oriented command interpreter)
 	Updated 11/2017: added checksum comparison function for CRC32
 	Updated 10/2017: added checksum comparison function for MD5 and CKSUM
@@ -43,13 +43,19 @@ import cmd
 import os
 import re
 import shutil
+import base64
 import getpass
 import hashlib
 import builtins
 import lxml.etree
 import posixpath
-import urllib2, cookielib
 import calendar, time
+if sys.version_info[0] == 2:
+	from cookielib import CookieJar
+	import urllib2
+else:
+	from http.cookiejar import CookieJar
+	import urllib.request as urllib2
 
 #-- PURPOSE: creates Earthdata class containing the main functions and variables
 class earthdata(cmd.Cmd):
@@ -86,19 +92,20 @@ class earthdata(cmd.Cmd):
 
 	#-- PURPOSE: "login" to NASA Earthdata with supplied credentials
 	def https_opener(self):
-		#-- https://docs.python.org/2/howto/urllib2.html#id6
+		#-- https://docs.python.org/3/howto/urllib2.html#id5
 		#-- create a password manager
 		password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
 		#-- Add the username and password for NASA Earthdata Login system
 		password_mgr.add_password(None,'https://urs.earthdata.nasa.gov',self.user,self.password)
 		#-- Encode username/password for request authorization headers
-		base64_string = urllib2.base64.b64encode('{0}:{1}'.format(self.user,self.password))
+		base64_string = base64.b64encode('{0}:{1}'.format(self.user,self.password))
 		#-- Create cookie jar for storing cookies. This is used to store and return
 		#-- the session cookie given to use by the data server (otherwise will just
 		#-- keep sending us back to Earthdata Login to authenticate).
-		cookie_jar = cookielib.CookieJar()
+		cookie_jar = CookieJar()
 		#-- create "opener" (OpenerDirector instance)
-		opener = urllib2.build_opener(urllib2.HTTPBasicAuthHandler(password_mgr),
+		opener = urllib2.build_opener(
+			urllib2.HTTPBasicAuthHandler(password_mgr),
 		    #urllib2.HTTPHandler(debuglevel=1),  # Uncomment these two lines to see
 		    #urllib2.HTTPSHandler(debuglevel=1), # details of the requests/responses
 			urllib2.HTTPCookieProcessor(cookie_jar))
@@ -249,7 +256,7 @@ class earthdata(cmd.Cmd):
 				fileBasename,fileExtension = os.path.splitext(colnames[i])
 				regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
 				xml, = [f for f in colnames if re.match(regex_pattern,f)]
-				self.remote_xml='{0}{1}/{2}'.format('https://',remote_dir,xml)
+				self.remote_xml = posixpath.join('https://',remote_dir,xml)
 			#-- get last modified date and convert into unix time
 			Y,M,D,H,MN = [int(v) for v in R2.findall(collastmod[i]).pop()]
 			self.remote_mtime = calendar.timegm((Y,M,D,H,MN,0))
@@ -296,7 +303,7 @@ class earthdata(cmd.Cmd):
 					fileBasename,fileExtension = os.path.splitext(colnames[i])
 					regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
 					xml, = [f for f in colnames if re.match(regex_pattern,f)]
-					self.remote_xml='{0}{1}/{2}'.format('https://',remote_dir,xml)
+					self.remote_xml = posixpath.join('https://',remote_dir,xml)
 				#-- get last modified date and convert into unix time
 				Y,M,D,H,MN = [int(v) for v in R2.findall(collastmod[i]).pop()]
 				self.remote_mtime = calendar.timegm((Y,M,D,H,MN,0))
@@ -336,7 +343,7 @@ class earthdata(cmd.Cmd):
 				fileBasename,fileExtension = os.path.splitext(colnames[i])
 				regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
 				xml, = [f for f in colnames if re.match(regex_pattern,f)]
-				self.remote_xml='{0}{1}/{2}'.format('https://',remote_dir,xml)
+				self.remote_xml = posixpath.join('https://',remote_dir,xml)
 			#-- get last modified date and convert into unix time
 			Y,M,D,H,MN = [int(v) for v in R2.findall(collastmod[i]).pop()]
 			self.remote_mtime = calendar.timegm((Y,M,D,H,MN,0))
@@ -354,7 +361,7 @@ class earthdata(cmd.Cmd):
 		#-- make sure local directory exists
 		os.makedirs(local_dir,self.mode) if not os.path.exists(local_dir) else None
 		#-- submit request
-		req = urllib2.Request(url='{0}{1}'.format('https://',remote_dir))
+		req = urllib2.Request(url=posixpath.join('https://',remote_dir))
 		#-- read and parse request for remote files (columns and dates)
 		tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
 		colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
@@ -362,14 +369,14 @@ class earthdata(cmd.Cmd):
 		regex_pattern = '{0}$'.format(args)
 		i, = [i for i,f in enumerate(colnames) if re.match(regex_pattern,f)]
 		#-- remote and local versions of the file
-		self.remote_file = '{0}{1}/{2}'.format('https://',remote_dir,colnames[i])
+		self.remote_file = posixpath.join('https://',remote_dir,colnames[i])
 		self.local_file = os.path.join(local_dir,colnames[i])
 		#-- create regular expression pattern for finding xml files
 		if self.checksums:
 			fileBasename,fileExtension = os.path.splitext(args)
 			regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
 			xml, = [f for f in colnames if re.match(regex_pattern,f)]
-			self.remote_xml='{0}{1}/{2}'.format('https://',remote_dir,xml)
+			self.remote_xml = posixpath.join('https://',remote_dir,xml)
 		#-- compile regular expression operator for extracting modification date
 		date_regex_pattern = '(\d+)\-(\d+)\-(\d+)\s(\d+)\:(\d+)'
 		R2 = re.compile(date_regex_pattern, re.VERBOSE)
