@@ -57,7 +57,7 @@ Recursively sync all directories with a local directory
 ```
 
 #### Dependencies
-[lxml: processing XML and HTML in Python](https://pypi.python.org/pypi/lxml)
+[lxml: processing XML and HTML in Python](https://pypi.python.org/pypi/lxml)  
 [future: Compatibility layer between Python 2 and Python 3](http://python-future.org/)
 
 #### Download
