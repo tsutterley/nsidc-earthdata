@@ -1,1 +1,1 @@
-from earthdata import earthdata
+from earthdata.earthdata import earthdata
