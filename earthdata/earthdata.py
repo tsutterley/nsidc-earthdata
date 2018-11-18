@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (06/2018)
+Written by Tyler Sutterley (11/2018)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -27,6 +27,7 @@ PYTHON DEPENDENCIES:
 		(http://python-future.org/)
 
 UPDATE HISTORY:
+	Updated 11/2018: encode base64 strings for python3 compatibility
 	Updated 06/2018: using python3 compatible octal, input and urllib
 	Updated 05/2018: using python cmd module (line-oriented command interpreter)
 	Updated 11/2017: added checksum comparison function for CRC32
@@ -98,7 +99,7 @@ class earthdata(cmd.Cmd):
 		#-- Add the username and password for NASA Earthdata Login system
 		password_mgr.add_password(None,'https://urs.earthdata.nasa.gov',self.user,self.password)
 		#-- Encode username/password for request authorization headers
-		base64_string = base64.b64encode('{0}:{1}'.format(self.user,self.password))
+		base64_string = base64.b64encode('{0}:{1}'.format(self.user,self.password).encode())
 		#-- Create cookie jar for storing cookies. This is used to store and return
 		#-- the session cookie given to use by the data server (otherwise will just
 		#-- keep sending us back to Earthdata Login to authenticate).
