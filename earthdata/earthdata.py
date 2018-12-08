@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (11/2018)
+Written by Tyler Sutterley (12/2018)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -27,6 +27,7 @@ PYTHON DEPENDENCIES:
 		(http://python-future.org/)
 
 UPDATE HISTORY:
+	Updated 12/2018: decode authorization header for python3 compatibility
 	Updated 11/2018: encode base64 strings for python3 compatibility
 	Updated 06/2018: using python3 compatible octal, input and urllib
 	Updated 05/2018: using python cmd module (line-oriented command interpreter)
@@ -111,7 +112,8 @@ class earthdata(cmd.Cmd):
 		    #urllib2.HTTPSHandler(debuglevel=1), # details of the requests/responses
 			urllib2.HTTPCookieProcessor(cookie_jar))
 		#-- add Authorization header to opener
-		opener.addheaders = [("Authorization", "Basic {0}".format(base64_string))]
+		authorization_header = "Basic {0}".format(base64_string.decode())
+		opener.addheaders = [("Authorization", authorization_header)]
 		#-- Now all calls to urllib2.urlopen will use the opener.
 		urllib2.install_opener(opener)
 		#-- All calls to urllib2.urlopen will now use handler
