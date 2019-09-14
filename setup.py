@@ -5,7 +5,7 @@ setup(
 	description='ftp-like program for searching NSIDC databases and retrieving NASA Operation IceBridge data',
 	url='https://github.com/tsutterley/nsidc-earthdata',
 	author='Tyler Sutterley',
-	author_email='tyler.c.sutterley@nasa.gov',
+	author_email='tsutterl@uw.edu',
 	license='MIT',
 	classifiers=[
 		'Development Status :: 3 - Alpha',
