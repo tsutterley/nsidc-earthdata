@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (12/2018)
+Written by Tyler Sutterley (09/2019)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -27,6 +27,8 @@ PYTHON DEPENDENCIES:
 		(http://python-future.org/)
 
 UPDATE HISTORY:
+	Updated 09/2019: added ssl context to urlopen headers
+	Updated 06/2019: use strptime to extract last modified time of remote files
 	Updated 12/2018: decode authorization header for python3 compatibility
 	Updated 11/2018: encode base64 strings for python3 compatibility
 	Updated 06/2018: using python3 compatible octal, input and urllib
@@ -44,6 +46,7 @@ import sys
 import cmd
 import os
 import re
+import ssl
 import shutil
 import base64
 import getpass
@@ -108,8 +111,7 @@ class earthdata(cmd.Cmd):
 		#-- create "opener" (OpenerDirector instance)
 		opener = urllib2.build_opener(
 			urllib2.HTTPBasicAuthHandler(password_mgr),
-		    #urllib2.HTTPHandler(debuglevel=1),  # Uncomment these two lines to see
-		    #urllib2.HTTPSHandler(debuglevel=1), # details of the requests/responses
+			urllib2.HTTPSHandler(context=ssl.SSLContext()),
 			urllib2.HTTPCookieProcessor(cookie_jar))
 		#-- add Authorization header to opener
 		authorization_header = "Basic {0}".format(base64_string.decode())
@@ -246,9 +248,6 @@ class earthdata(cmd.Cmd):
 		#-- regular expression pattern
 		R1 = '(' + '|'.join(args.split()) + ')' if args else "^(?!Parent)"
 		remote_file_lines = [i for i,f in enumerate(colnames) if re.match(R1,f)]
-		#-- compile regular expression operator for extracting modification date
-		date_regex_pattern = '(\d+)\-(\d+)\-(\d+)\s(\d+)\:(\d+)'
-		R2 = re.compile(date_regex_pattern, re.VERBOSE)
 		#-- sync each data file
 		for i in remote_file_lines:
 			#-- remote and local versions of the file
@@ -261,8 +260,8 @@ class earthdata(cmd.Cmd):
 				xml, = [f for f in colnames if re.match(regex_pattern,f)]
 				self.remote_xml = posixpath.join('https://',remote_dir,xml)
 			#-- get last modified date and convert into unix time
-			Y,M,D,H,MN = [int(v) for v in R2.findall(collastmod[i]).pop()]
-			self.remote_mtime = calendar.timegm((Y,M,D,H,MN,0))
+			lastmodtime = time.strptime(collastmod[i].rstrip(),'%Y-%m-%d %H:%M')
+			self.remote_mtime = calendar.timegm(lastmodtime)
 			#-- sync files with server (clobber set to False: will NOT overwrite)
 			self.http_pull_file(False)
 		#-- close request
@@ -279,9 +278,6 @@ class earthdata(cmd.Cmd):
 		R1 = '(' + '|'.join(args.split()) + ')' if args else "^(?!Parent)"
 		colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
 		subdirectories = [sd for sd in colnames if re.match(R1,sd)]
-		#-- compile regular expression operator for extracting modification date
-		date_regex_pattern = '(\d+)\-(\d+)\-(\d+)\s(\d+)\:(\d+)'
-		R2 = re.compile(date_regex_pattern, re.VERBOSE)
 		for sd in subdirectories:
 			#-- local and remote directories
 			local_dir = os.path.join(self.local_directory,sd)
@@ -308,8 +304,8 @@ class earthdata(cmd.Cmd):
 					xml, = [f for f in colnames if re.match(regex_pattern,f)]
 					self.remote_xml = posixpath.join('https://',remote_dir,xml)
 				#-- get last modified date and convert into unix time
-				Y,M,D,H,MN = [int(v) for v in R2.findall(collastmod[i]).pop()]
-				self.remote_mtime = calendar.timegm((Y,M,D,H,MN,0))
+				lastmodtime = time.strptime(collastmod[i].rstrip(),'%Y-%m-%d %H:%M')
+				self.remote_mtime = calendar.timegm(lastmodtime)
 				#-- sync files with server (clobber set to False: will NOT overwrite)
 				self.http_pull_file(False)
 		#-- close request
@@ -333,9 +329,6 @@ class earthdata(cmd.Cmd):
 		regex_pattern = '(' + '|'.join(args.split()) + ')' if args else "^(?!Parent)"
 		remote_file_lines = [i for i,f in enumerate(colnames) if
 			re.match(regex_pattern,f)]
-		#-- compile regular expression operator for extracting modification date
-		date_regex_pattern = '(\d+)\-(\d+)\-(\d+)\s(\d+)\:(\d+)'
-		R2 = re.compile(date_regex_pattern, re.VERBOSE)
 		#-- get each data file
 		for i in remote_file_lines:
 			#-- remote and local versions of the file
@@ -348,8 +341,8 @@ class earthdata(cmd.Cmd):
 				xml, = [f for f in colnames if re.match(regex_pattern,f)]
 				self.remote_xml = posixpath.join('https://',remote_dir,xml)
 			#-- get last modified date and convert into unix time
-			Y,M,D,H,MN = [int(v) for v in R2.findall(collastmod[i]).pop()]
-			self.remote_mtime = calendar.timegm((Y,M,D,H,MN,0))
+			lastmodtime = time.strptime(collastmod[i].rstrip(),'%Y-%m-%d %H:%M')
+			self.remote_mtime = calendar.timegm(lastmodtime)
 			#-- get files from server (clobber set to True: will overwrite)
 			self.http_pull_file(True)
 		#-- close request
@@ -380,12 +373,9 @@ class earthdata(cmd.Cmd):
 			regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
 			xml, = [f for f in colnames if re.match(regex_pattern,f)]
 			self.remote_xml = posixpath.join('https://',remote_dir,xml)
-		#-- compile regular expression operator for extracting modification date
-		date_regex_pattern = '(\d+)\-(\d+)\-(\d+)\s(\d+)\:(\d+)'
-		R2 = re.compile(date_regex_pattern, re.VERBOSE)
 		#-- get last modified date and convert into unix time
-		Y,M,D,H,MN = [int(v) for v in R2.findall(collastmod[i]).pop()]
-		self.remote_mtime = calendar.timegm((Y,M,D,H,MN,0))
+		lastmodtime = time.strptime(collastmod[i].rstrip(),'%Y-%m-%d %H:%M')
+		self.remote_mtime = calendar.timegm(lastmodtime)
 		#-- get file from server (clobber set to True: will overwrite)
 		self.http_pull_file(True)
 		#-- close request
