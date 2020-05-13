@@ -33,7 +33,7 @@ COMMAND LINE OPTIONS:
 
 PYTHON DEPENDENCIES:
     lxml: Pythonic XML and HTML processing library using libxml2/libxslt
-        http://lxml.de/
+        https://lxml.de/
         https://github.com/lxml/lxml
 
 UPDATE HISTORY:

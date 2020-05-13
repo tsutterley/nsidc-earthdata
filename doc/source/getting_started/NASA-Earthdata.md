@@ -16,6 +16,11 @@ The [National Snow and Ice Data Center (NSIDC)](https://nsidc.org/daac/) DAAC pr
 1. [Register with NASA Earthdata Login system](https://urs.earthdata.nasa.gov/users/new)  
 2. [After registering, login to the system](https://urs.earthdata.nasa.gov/home)
 3. Add `NSIDC_DATAPOOL_OPS` and `nsidc-daacdata` [applications to Earthdata](https://wiki.earthdata.nasa.gov/display/EL/How+To+Pre-authorize+an+application)  
+4. Copy your NASA Earthdata credentials or [create a .netrc file](https://nsidc.org/support/how/v0-programmatic-data-access-guide) to store your credentials permanently  
+```bash
+echo "machine urs.earthdata.nasa.gov login <uid> password <password>" >> ~/.netrc
+chmod 0600 ~/.netrc
+```
 
 #### Other Data Access Examples   
 - [Curl and Wget](https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+cURL+And+Wget)   

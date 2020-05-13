@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (09/2019)
+Written by Tyler Sutterley (05/2020)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -21,12 +21,13 @@ COMMAND LINE OPTIONS:
 
 PYTHON DEPENDENCIES:
     lxml: Pythonic XML and HTML processing library using libxml2/libxslt
-        http://lxml.de/
+        https://lxml.de/
         https://github.com/lxml/lxml
     future: Compatibility layer between Python 2 and Python 3
         (http://python-future.org/)
 
 UPDATE HISTORY:
+    Updated 05/2020: will check for netrc file before asking for authentication
     Updated 09/2019: added ssl context to urlopen headers
     Updated 06/2019: use strptime to extract last modified time of remote files
     Updated 12/2018: decode authorization header for python3 compatibility
@@ -47,6 +48,7 @@ import cmd
 import os
 import re
 import ssl
+import netrc
 import shutil
 import base64
 import getpass
@@ -67,6 +69,9 @@ class earthdata(cmd.Cmd):
     def __init__(self, parent=None):
         #-- call constructor of parent class
         cmd.Cmd.__init__(self)
+        #-- NASA Earthdata Login system
+        self.urs = 'urs.earthdata.nasa.gov'
+        self.netrc = os.path.expanduser('~/.netrc')
         #-- NSIDC host for Pre-Icebridge and IceBridge data
         self.host = 'n5eil01u.ecs.nsidc.org'
         self.prompt = '> '
@@ -92,8 +97,12 @@ class earthdata(cmd.Cmd):
 
     #-- PURPOSE: get the username and password for NASA Earthdata login
     def get_credentials(self):
-        self.user = builtins.input('Username for {0}: '.format(self.host))
-        self.password = getpass.getpass('Password for {0}@{1}: '.format(self.user,self.host))
+        #-- try using netrc authentication before manual entry of credentials
+        try:
+            self.user,LOGIN,self.password = netrc.netrc(self.netrc).authenticators(self.urs)
+        except (FileNotFoundError, TypeError):
+            self.user = builtins.input('Username for {0}: '.format(self.urs))
+            self.password = getpass.getpass('Password for {0}@{1}: '.format(self.user,self.urs))
 
     #-- PURPOSE: "login" to NASA Earthdata with supplied credentials
     def https_opener(self):
@@ -101,7 +110,7 @@ class earthdata(cmd.Cmd):
         #-- create a password manager
         password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
         #-- Add the username and password for NASA Earthdata Login system
-        password_mgr.add_password(None,'https://urs.earthdata.nasa.gov',self.user,self.password)
+        password_mgr.add_password(None,posixpath.join('https://',self.urs),self.user,self.password)
         #-- Encode username/password for request authorization headers
         base64_string = base64.b64encode('{0}:{1}'.format(self.user,self.password).encode())
         #-- Create cookie jar for storing cookies. This is used to store and return

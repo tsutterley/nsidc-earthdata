@@ -1,4 +1,4 @@
-name: example-environment
+name: nsidc-earthdata
 channels:
   - conda-forge
 dependencies:
