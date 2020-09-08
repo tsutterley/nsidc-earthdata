@@ -13,7 +13,7 @@ python setup.py install
 ```
 or `pip`
 ```bash
-pip install --user .
+python3 -m pip install --user .
 ```
 
 Executable versions of this repository can also be tested using [Binder](https://mybinder.org/v2/gh/tsutterley/nsidc-earthdata/master) and [Pangeo](https://binder.pangeo.io/v2/gh/tsutterley/nsidc-earthdata/master).

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (05/2020)
+Written by Tyler Sutterley (09/2020)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -27,6 +27,7 @@ PYTHON DEPENDENCIES:
         (http://python-future.org/)
 
 UPDATE HISTORY:
+    Updated 09/2020: add manual retries to enter NASA Earthdata credentials
     Updated 05/2020: will check for netrc file before asking for authentication
     Updated 09/2019: added ssl context to urlopen headers
     Updated 06/2019: use strptime to extract last modified time of remote files
@@ -91,9 +92,18 @@ class earthdata(cmd.Cmd):
         self.xmlparser = lxml.etree.XMLParser()
         #-- enter credentials with password entered securely from the command-line
         self.get_credentials()
+        self.retries = 4
         #-- create https opener for NASA Earthdata using supplied credentials
-        self.https_opener()
-        self.check_credentials()
+        #-- attempt to login with supplied credentials up to number of retries
+        assert self.retries >= 1
+        for _ in range(self.retries):
+            self.https_opener()
+            if self.check_credentials():
+                break
+            self.manual_credentials()
+        else:
+            print('Authentication Error: Check your NASA Earthdata credentials')
+            sys.exit()
 
     #-- PURPOSE: get the username and password for NASA Earthdata login
     def get_credentials(self):
@@ -101,8 +111,12 @@ class earthdata(cmd.Cmd):
         try:
             self.user,LOGIN,self.password = netrc.netrc(self.netrc).authenticators(self.urs)
         except (FileNotFoundError, TypeError):
-            self.user = builtins.input('Username for {0}: '.format(self.urs))
-            self.password = getpass.getpass('Password for {0}@{1}: '.format(self.user,self.urs))
+            self.manual_credentials()
+
+    #-- PURPOSE: manually enter credentials
+    def manual_credentials(self):
+        self.user = builtins.input('Username for {0}: '.format(self.urs))
+        self.password = getpass.getpass('Password for {0}@{1}: '.format(self.user,self.urs))
 
     #-- PURPOSE: "login" to NASA Earthdata with supplied credentials
     def https_opener(self):
@@ -138,8 +152,9 @@ class earthdata(cmd.Cmd):
             request = urllib2.Request(url=remote_path)
             response = urllib2.urlopen(request, timeout=20)
         except urllib2.HTTPError:
-            print('AUTHENTICATION ERROR: check your NASA Earthdata credentials')
-            sys.exit()
+            print('Authentication Error: Retry your NASA Earthdata credentials')
+        else:
+            return True
 
     #-- PURPOSE: help module that lists the commands for the program
     def do_usage(self, *kwargs):
