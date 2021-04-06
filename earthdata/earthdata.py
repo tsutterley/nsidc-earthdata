@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (09/2020)
+Written by Tyler Sutterley (04/2021)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -27,6 +27,8 @@ PYTHON DEPENDENCIES:
         (http://python-future.org/)
 
 UPDATE HISTORY:
+    Updated 04/2021: default credentials from environmental variables
+    Updated 03/2021: added sha1 checksum
     Updated 09/2020: add manual retries to enter NASA Earthdata credentials
     Updated 05/2020: will check for netrc file before asking for authentication
     Updated 09/2019: added ssl context to urlopen headers
@@ -72,12 +74,16 @@ class earthdata(cmd.Cmd):
         cmd.Cmd.__init__(self)
         #-- NASA Earthdata Login system
         self.urs = 'urs.earthdata.nasa.gov'
-        self.netrc = os.path.expanduser('~/.netrc')
         #-- NSIDC host for Pre-Icebridge and IceBridge data
         self.host = 'n5eil01u.ecs.nsidc.org'
         self.prompt = '> '
         self.intro = 'Welcome to {0}'.format(self.host)
         self.goodbye = 'Goodbye!'
+        #-- credentials from environmental variables
+        self.user = os.environ.get('EARTHDATA_USERNAME')
+        self.password = os.environ.get('EARTHDATA_PASSWORD')
+        #-- default netrc file for credentials
+        self.netrc = os.path.join(os.path.expanduser('~'),'.netrc')
         #-- remote https server for IceBridge Data (can cd to ../PRE_OIB)
         self.remote_directory = posixpath.join(self.host,"ICEBRIDGE")
         self.local_directory = os.getcwd()
@@ -90,11 +96,13 @@ class earthdata(cmd.Cmd):
         #-- compile HTML and xml parsers for lxml
         self.htmlparser = lxml.etree.HTMLParser()
         self.xmlparser = lxml.etree.XMLParser()
-        #-- enter credentials with password entered securely from the command-line
-        self.get_credentials()
-        self.retries = 4
+        #-- enter credentials with password entered securely
+        #-- from the command-line or from .netrc file
+        if not self.user or not self.password:
+            self.get_credentials()
         #-- create https opener for NASA Earthdata using supplied credentials
         #-- attempt to login with supplied credentials up to number of retries
+        self.retries = 4
         assert self.retries >= 1
         for _ in range(self.retries):
             self.https_opener()
@@ -109,7 +117,7 @@ class earthdata(cmd.Cmd):
     def get_credentials(self):
         #-- try using netrc authentication before manual entry of credentials
         try:
-            self.user,LOGIN,self.password = netrc.netrc(self.netrc).authenticators(self.urs)
+            self.user,_,self.password = netrc.netrc(self.netrc).authenticators(self.urs)
         except (FileNotFoundError, TypeError):
             self.manual_credentials()
 
@@ -279,7 +287,7 @@ class earthdata(cmd.Cmd):
             self.local_file = os.path.join(local_dir,colnames[i])
             #-- create regular expression pattern for finding xml files
             if self.checksums:
-                fileBasename,fileExtension = os.path.splitext(colnames[i])
+                fileBasename,_ = os.path.splitext(colnames[i])
                 regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
                 xml, = [f for f in colnames if re.match(regex_pattern,f)]
                 self.remote_xml = posixpath.join('https://',remote_dir,xml)
@@ -323,7 +331,7 @@ class earthdata(cmd.Cmd):
                 self.local_file = os.path.join(local_dir,colnames[i])
                 #-- create regular expression pattern for finding xml files
                 if self.checksums:
-                    fileBasename,fileExtension = os.path.splitext(colnames[i])
+                    fileBasename,_ = os.path.splitext(colnames[i])
                     regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
                     xml, = [f for f in colnames if re.match(regex_pattern,f)]
                     self.remote_xml = posixpath.join('https://',remote_dir,xml)
@@ -360,7 +368,7 @@ class earthdata(cmd.Cmd):
             self.local_file = os.path.join(local_dir,colnames[i])
             #-- create regular expression pattern for finding xml files
             if self.checksums:
-                fileBasename,fileExtension = os.path.splitext(colnames[i])
+                fileBasename,_ = os.path.splitext(colnames[i])
                 regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
                 xml, = [f for f in colnames if re.match(regex_pattern,f)]
                 self.remote_xml = posixpath.join('https://',remote_dir,xml)
@@ -393,7 +401,7 @@ class earthdata(cmd.Cmd):
         self.local_file = os.path.join(local_dir,colnames[i])
         #-- create regular expression pattern for finding xml files
         if self.checksums:
-            fileBasename,fileExtension = os.path.splitext(args)
+            fileBasename,_ = os.path.splitext(args)
             regex_pattern = '{0}(.*?).xml$'.format(fileBasename)
             xml, = [f for f in colnames if re.match(regex_pattern,f)]
             self.remote_xml = posixpath.join('https://',remote_dir,xml)
@@ -481,6 +489,8 @@ class earthdata(cmd.Cmd):
         #-- generate checksum hash for a given type
         if (checksum_type == 'MD5'):
             return hashlib.md5(file_buffer).hexdigest()
+        elif (checksum_type == 'sha1'):
+            return hashlib.sha1(file_buffer).hexdigest()
         elif (checksum_type == 'CKSUM'):
             crc32_table = []
             for b in range(0,256):

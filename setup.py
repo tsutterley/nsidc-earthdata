@@ -1,8 +1,24 @@
 from setuptools import setup, find_packages
+
+# package description and keywords
+description = ('ftp-like program for searching NSIDC databases and '
+    'retrieving NASA Operation IceBridge data')
+keywords = 'NSIDC Earthdata Operation IceBridge download'
+# get long_description from README.rst
+with open("README.rst", "r") as fh:
+    long_description = fh.read()
+long_description_content_type = "text/x-rst"
+
+# get version
+with open('version.txt') as fh:
+    version = fh.read()
+
 setup(
     name='nsidc-earthdata',
-    version='1.0.1.2',
-    description='ftp-like program for searching NSIDC databases and retrieving NASA Operation IceBridge data',
+    version=version,
+    description=description,
+    long_description=long_description,
+    long_description_content_type=long_description_content_type,
     url='https://github.com/tsutterley/nsidc-earthdata',
     author='Tyler Sutterley',
     author_email='tsutterl@uw.edu',
