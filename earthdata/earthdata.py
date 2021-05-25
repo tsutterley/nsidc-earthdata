@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (04/2021)
+Written by Tyler Sutterley (05/2021)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -27,6 +27,7 @@ PYTHON DEPENDENCIES:
         (http://python-future.org/)
 
 UPDATE HISTORY:
+    Updated 05/2021: added option for connection timeout (in seconds)
     Updated 04/2021: default credentials from environmental variables
     Updated 03/2021: added sha1 checksum
     Updated 09/2020: add manual retries to enter NASA Earthdata credentials
@@ -87,6 +88,10 @@ class earthdata(cmd.Cmd):
         #-- remote https server for IceBridge Data (can cd to ../PRE_OIB)
         self.remote_directory = posixpath.join(self.host,"ICEBRIDGE")
         self.local_directory = os.getcwd()
+        #-- default timeout in seconds for blocking operations
+        self.timeout = 20
+        #-- default number of retries for retrieving files and supplying credentials
+        self.retries = 5
         #-- verbosity settings
         self.verbose = True
         #-- run checksums for all downloaded data files
@@ -102,7 +107,6 @@ class earthdata(cmd.Cmd):
             self.get_credentials()
         #-- create https opener for NASA Earthdata using supplied credentials
         #-- attempt to login with supplied credentials up to number of retries
-        self.retries = 4
         assert self.retries >= 1
         for _ in range(self.retries):
             self.https_opener()
@@ -158,7 +162,7 @@ class earthdata(cmd.Cmd):
         try:
             remote_path = posixpath.join('https://',self.remote_directory)
             request = urllib2.Request(url=remote_path)
-            response = urllib2.urlopen(request, timeout=20)
+            response = urllib2.urlopen(request, timeout=self.timeout)
         except urllib2.HTTPError:
             print('Authentication Error: Retry your NASA Earthdata credentials')
         else:
@@ -178,6 +182,8 @@ class earthdata(cmd.Cmd):
         print(' mget\t\tGet all files in directory')
         print(' get\t\tGet a single file in a directory')
         print(' verbose\tToggle verbose output of program')
+        print(' timeout\tSet timeout in seconds for blocking operations')
+        print(' retry\tSet number of retry attempts for retrieving files')
         print(' checksum\tToggle checksum function within program')
         print(' exit\t\tExit program\n')
 
@@ -195,7 +201,7 @@ class earthdata(cmd.Cmd):
                 remote_path = posixpath.join('https://',RD)
                 req = urllib2.Request(url=remote_path)
                 try:
-                    response = urllib2.urlopen(req, timeout=20)
+                    response = urllib2.urlopen(req, timeout=self.timeout)
                 except urllib2.URLError:
                     #-- print an error if invalid
                     print('ERROR: {0} not a valid path'.format(remote_path))
@@ -209,7 +215,7 @@ class earthdata(cmd.Cmd):
             remote_path = posixpath.join('https://',self.remote_directory)
             req = urllib2.Request(url=remote_path)
             #-- read and parse request for subdirectories (find column names)
-            tree=lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
+            tree=lxml.etree.parse(urllib2.urlopen(req,timeout=self.timeout),self.htmlparser)
             colnames = tree.xpath('//td[@class="indexcolname"]//a/@href')
             print('\n'.join([w for w in colnames]))
         #-- close the request
@@ -226,7 +232,7 @@ class earthdata(cmd.Cmd):
         #-- attempt to connect to new remote directory
         remote_path = posixpath.join('https://',RD)
         try:
-            urllib2.urlopen(remote_path,timeout=20)
+            urllib2.urlopen(remote_path,timeout=self.timeout)
         except urllib2.URLError:
             #-- print an error if invalid
             print('ERROR: {0} not a valid path'.format(remote_path))
@@ -274,7 +280,7 @@ class earthdata(cmd.Cmd):
         #-- submit request
         req = urllib2.Request(url=posixpath.join('https://',remote_dir))
         #-- read and parse request for remote files (columns and dates)
-        tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
+        tree = lxml.etree.parse(urllib2.urlopen(req,timeout=self.timeout),self.htmlparser)
         colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
         collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
         #-- regular expression pattern
@@ -305,7 +311,7 @@ class earthdata(cmd.Cmd):
         #-- submit request
         req=urllib2.Request(url=posixpath.join('https://',self.remote_directory))
         #-- read and parse request for remote files (columns and dates)
-        tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
+        tree = lxml.etree.parse(urllib2.urlopen(req,timeout=self.timeout),self.htmlparser)
         #-- regular expression pattern
         R1 = '(' + '|'.join(args.split()) + ')' if args else "^(?!Parent)"
         colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
@@ -319,7 +325,7 @@ class earthdata(cmd.Cmd):
             #-- submit request
             req = urllib2.Request(url=remote_dir)
             #-- read and parse request for remote files (columns and dates)
-            tree=lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
+            tree=lxml.etree.parse(urllib2.urlopen(req,timeout=self.timeout),self.htmlparser)
             colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
             collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
             remote_file_lines = [i for i,f in enumerate(colnames) if
@@ -354,7 +360,7 @@ class earthdata(cmd.Cmd):
         #-- submit request
         req = urllib2.Request(url=posixpath.join('https://',remote_dir))
         #-- read and parse request for remote files (columns and dates)
-        tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
+        tree = lxml.etree.parse(urllib2.urlopen(req,timeout=self.timeout),self.htmlparser)
         colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
         collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
         #-- regular expression pattern
@@ -391,7 +397,7 @@ class earthdata(cmd.Cmd):
         #-- submit request
         req = urllib2.Request(url=posixpath.join('https://',remote_dir))
         #-- read and parse request for remote files (columns and dates)
-        tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.htmlparser)
+        tree = lxml.etree.parse(urllib2.urlopen(req,timeout=self.timeout),self.htmlparser)
         colnames = tree.xpath('//td[@class="indexcolname"]/a/text()')
         collastmod = tree.xpath('//td[@class="indexcollastmod"]/text()')
         regex_pattern = '{0}$'.format(args)
@@ -436,16 +442,30 @@ class earthdata(cmd.Cmd):
             if self.verbose:
                 print('{0} --> '.format(self.remote_file))
                 print('\t{0}{1}\n'.format(self.local_file,OVERWRITE))
-            #-- Create and submit request. There are a wide range of exceptions
-            #-- that can be thrown here, including HTTPError and URLError.
-            request = urllib2.Request(self.remote_file)
-            response = urllib2.urlopen(request, timeout=20)
             #-- chunked transfer encoding size
             CHUNK = 16 * 1024
-            #-- copy contents to local file using chunked transfer encoding
-            #-- transfer should work properly with ascii and binary data formats
-            with open(self.local_file, 'wb') as f:
-                shutil.copyfileobj(response, f, CHUNK)
+            #-- attempt to download up to the number of retries
+            retry_counter = 0
+            while (retry_counter < self.retries):
+                #-- attempt to retrieve file from https server
+                try:
+                    #-- Create and submit request. There are a wide range of exceptions
+                    #-- that can be thrown here, including HTTPError and URLError.
+                    request = urllib2.Request(self.remote_file)
+                    response = urllib2.urlopen(request, timeout=self.timeout)
+                    #-- copy contents to local file using chunked transfer encoding
+                    #-- transfer should work properly with ascii and binary data formats
+                    with open(self.local_file, 'wb') as f:
+                        shutil.copyfileobj(response, f, CHUNK)
+                except:
+                    pass
+                else:
+                    break
+                #-- add to retry counter
+                retry_counter += 1
+            #-- check if maximum number of retries were reached
+            if (retry_counter == self.retries):
+                raise TimeoutError('Maximum number of retries reached')
             #-- keep remote modification time of file and local access time
             os.utime(self.local_file, (os.stat(self.local_file).st_atime,
                 self.remote_mtime))
@@ -459,7 +479,7 @@ class earthdata(cmd.Cmd):
     def compare_checksum(self, *kwargs):
         #-- read and parse remote xml file
         req = urllib2.Request(self.remote_xml)
-        tree = lxml.etree.parse(urllib2.urlopen(req,timeout=20),self.xmlparser)
+        tree = lxml.etree.parse(urllib2.urlopen(req,timeout=self.timeout),self.xmlparser)
         filename, = tree.xpath('//DataFileContainer/DistributedFileName/text()')
         #-- if the DistributedFileName matches the synced filename
         if (os.path.basename(self.local_file) == filename):
@@ -523,6 +543,16 @@ class earthdata(cmd.Cmd):
     def do_verbose(self, *kwargs):
         """Toggle verbose output of program"""
         self.verbose ^= True
+
+    #-- PURPOSE: set the timeout in seconds for blocking operations
+    def do_timeout(self, timeout):
+        """Set the timeout in seconds for blocking operations"""
+        self.timeout = int(timeout)
+
+    #-- PURPOSE: set the number of retry attempts for retrieving files
+    def do_retry(self, retry):
+        """Set the number of retry attempts for retrieving files"""
+        self.retries = int(retry)
 
     #-- PURPOSE: toggle the checksum function within the program
     def do_checksum(self, *kwargs):

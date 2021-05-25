@@ -28,6 +28,8 @@ COMMAND LINE OPTIONS:
     mget: Get all files in directory
     get: Get a single file in a directory
     verbose: Toggle verbose output of program
+    timeout: Set timeout in seconds for blocking operations
+    retry: Set number of retry attempts for retrieving files
     checksum: Toggle checksum function within program
     exit: Exit program
 

@@ -26,6 +26,8 @@ checksum  get   lcd   mget  pwd    sync   verbose
  - `mget`: Get all files in directory
  - `get`: Get a single file in a directory
  - `verbose`: Toggle verbose output
+ - `timeout`: Set timeout in seconds for blocking operations
+ - `retry`: Set number of retry attempts for retrieving files
  - `checksum`: Toggle checksum function
  - `exit`: Exit program
 
