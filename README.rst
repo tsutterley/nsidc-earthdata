@@ -7,7 +7,6 @@ nsidc-earthdata
 |Documentation Status|
 |Binder|
 |Pangeo|
-|Shot Count|
 
 .. |Language| image:: https://img.shields.io/badge/python-v3.7-green.svg
    :target: https://www.python.org/
