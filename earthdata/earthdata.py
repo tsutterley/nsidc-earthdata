@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 earthdata.py
-Written by Tyler Sutterley (05/2021)
+Written by Tyler Sutterley (08/2021)
 ftp-like program for searching NSIDC databases and retrieving data
 
 COMMAND LINE OPTIONS:
@@ -27,6 +27,7 @@ PYTHON DEPENDENCIES:
         (http://python-future.org/)
 
 UPDATE HISTORY:
+    Updated 08/2021: NSIDC no longer requires authentication headers
     Updated 05/2021: added option for connection timeout (in seconds)
     Updated 04/2021: default credentials from environmental variables
     Updated 03/2021: added sha1 checksum
@@ -75,6 +76,12 @@ class earthdata(cmd.Cmd):
         cmd.Cmd.__init__(self)
         #-- NASA Earthdata Login system
         self.urs = 'urs.earthdata.nasa.gov'
+        #-- NSIDC opener arguments
+        self.context = ssl.SSLContext()
+        self.password_manager = True
+        self.get_ca_certs = False,
+        self.redirect = False
+        self.authorization_header = False
         #-- NSIDC host for Pre-Icebridge and IceBridge data
         self.host = 'n5eil01u.ecs.nsidc.org'
         self.prompt = '> '
@@ -133,26 +140,34 @@ class earthdata(cmd.Cmd):
     #-- PURPOSE: "login" to NASA Earthdata with supplied credentials
     def https_opener(self):
         #-- https://docs.python.org/3/howto/urllib2.html#id5
+        handler = []
         #-- create a password manager
-        password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
-        #-- Add the username and password for NASA Earthdata Login system
-        password_mgr.add_password(None,posixpath.join('https://',self.urs),self.user,self.password)
-        #-- Encode username/password for request authorization headers
-        base64_string = base64.b64encode('{0}:{1}'.format(self.user,self.password).encode())
+        if self.password_manager:
+            password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+            #-- Add the username and password for NASA Earthdata Login system
+            password_mgr.add_password(None,self.urs,self.user,self.password)
+            handler.append(urllib2.HTTPBasicAuthHandler(password_mgr))
         #-- Create cookie jar for storing cookies. This is used to store and return
         #-- the session cookie given to use by the data server (otherwise will just
         #-- keep sending us back to Earthdata Login to authenticate).
         cookie_jar = CookieJar()
+        handler.append(urllib2.HTTPCookieProcessor(cookie_jar))
+        #-- SSL context handler
+        if self.get_ca_certs:
+            self.context.get_ca_certs()
+        handler.append(urllib2.HTTPSHandler(context=self.context))
+        #-- redirect handler
+        if self.redirect:
+            handler.append(urllib2.HTTPRedirectHandler())
         #-- create "opener" (OpenerDirector instance)
-        opener = urllib2.build_opener(
-            urllib2.HTTPBasicAuthHandler(password_mgr),
-            urllib2.HTTPSHandler(context=ssl.SSLContext()),
-            urllib2.HTTPCookieProcessor(cookie_jar))
+        self.opener = urllib2.build_opener(*handler)
+        #-- Encode username/password for request authorization headers
         #-- add Authorization header to opener
-        authorization_header = "Basic {0}".format(base64_string.decode())
-        opener.addheaders = [("Authorization", authorization_header)]
-        #-- Now all calls to urllib2.urlopen will use the opener.
-        urllib2.install_opener(opener)
+        if self.authorization_header:
+            b64 = base64.b64encode('{0}:{1}'.format(self.user,self.password).encode())
+            self.opener.addheaders = [("Authorization","Basic {0}".format(b64.decode()))]
+        #-- Now all calls to urllib2.urlopen use our opener.
+        urllib2.install_opener(self.opener)
         #-- All calls to urllib2.urlopen will now use handler
         #-- Make sure not to include the protocol in with the URL, or
         #-- HTTPPasswordMgrWithDefaultRealm will be confused.
