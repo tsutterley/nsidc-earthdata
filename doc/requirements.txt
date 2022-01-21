@@ -4,3 +4,4 @@ nbsphinx-link
 recommonmark
 sphinx_markdown_tables
 sphinx_rtd_theme
+docutils<0.18
