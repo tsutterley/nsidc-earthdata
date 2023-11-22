@@ -485,7 +485,7 @@ class api(cmd.Cmd):
         TEST = False
         OVERWRITE = ' (clobber)'
         # check if local version of file exists
-        if self.local_file.exist():
+        if self.local_file.exists():
             # check last modification time of local file
             local_mtime = self.local_file.stat().st_mtime
             # if remote file is newer: overwrite the local file
