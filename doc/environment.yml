@@ -1,0 +1,24 @@
+name: earthdata-docs
+channels:
+  - conda-forge
+dependencies:
+  - docutils<0.18
+  - fontconfig
+  - freetype
+  - future
+  - graphviz
+  - lxml
+  - nbsphinx
+  - nbsphinx-link
+  - numpy
+  - numpydoc
+  - pip
+  - python>=3.6
+  - recommonmark
+  - sphinx
+  - sphinx_markdown_tables
+  - sphinx_rtd_theme
+  - pip:
+    - sphinx-argparse>=0.4
+    - ..
+
