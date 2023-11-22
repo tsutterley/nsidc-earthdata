@@ -1,4 +1,4 @@
-name: nsidc-earthdata
+name: nsidc_earthdata
 channels:
   - conda-forge
 dependencies:

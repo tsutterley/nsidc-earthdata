@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 u"""
 nsidc_earthdata.py
-Written by Tyler Sutterley (05/2018)
+Written by Tyler Sutterley (11/2023)
 ftp-like program for searching NSIDC databases and retrieving data
 This is a wrapper function for entering credentials and running the program
 
@@ -39,24 +39,25 @@ PYTHON DEPENDENCIES:
         https://github.com/lxml/lxml
 
 UPDATE HISTORY:
+    Updated 11/2023: renamed cmd module to api.py
     Updated 05/2018: using python cmd module (line-oriented command interpreter)
     Updated 09/2017: updated header text
     Written 08/2017
 """
 from __future__ import print_function
-from earthdata import earthdata
+import earthdata.api
 
-#-- PURPOSE: ftp-like program for searching NSIDC databases and retrieving data
+# PURPOSE: ftp-like program for searching NSIDC databases and retrieving data
 def main():
-    #-- run Earthdata program
-    #-- ftp-like program for searching NSIDC databases and retrieving data
-    prompt = earthdata()
-    #-- print introductory message
-    #-- run program until exit or keyboard interrupt
+    # run Earthdata program
+    # ftp-like program for searching NSIDC databases and retrieving data
+    prompt = earthdata.api()
+    # print introductory message
+    # run program until exit or keyboard interrupt
     prompt.cmdloop(prompt.intro)
-    #-- print goodbye message
+    # print goodbye message
     print(prompt.goodbye)
 
-#-- run main program
+# run main program
 if __name__ == '__main__':
     main()

@@ -15,7 +15,7 @@ Installation
 
 Presently ``nsidc-earthdata`` is only available for use as a
 `GitHub repository <https://github.com/tsutterley/nsidc-earthdata>`_.
-The contents of the repository can be download as a
+The contents of the repository can be downloaded as a
 `zipped file <https://github.com/tsutterley/nsidc-earthdata/archive/main.zip>`_  or cloned.
 To use this repository, please fork into your own account and then clone onto your system.
 
@@ -40,7 +40,3 @@ Alternatively can install the utilities directly from GitHub with ``pip``:
 .. code-block:: bash
 
     python3 -m pip install --user git+https://github.com/tsutterley/nsidc-earthdata.git
-
-Executable versions of this repository can also be tested using
-`Binder <https://mybinder.org/v2/gh/tsutterley/nsidc-earthdata/main>`_ or
-`Pangeo <https://binder.pangeo.io/v2/gh/tsutterley/nsidc-earthdata/main>`_.

@@ -21,4 +21,4 @@ ftp-like program for searching NSIDC databases and retrieving NASA Operation Ice
     :caption: User Guide:
     :hidden:
 
-    user_guide/earthdata.md
+    user_guide/api.md
