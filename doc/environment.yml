@@ -6,7 +6,6 @@ dependencies:
   - fontconfig
   - freetype
   - future
-  - graphviz
   - lxml
   - nbsphinx
   - nbsphinx-link
@@ -16,7 +15,6 @@ dependencies:
   - python>=3.6
   - recommonmark
   - sphinx
-  - sphinx_markdown_tables
   - sphinx_rtd_theme
   - pip:
     - sphinx-argparse>=0.4
