@@ -26,7 +26,7 @@ Register with NASA Earthdata Login system and add ``NSIDC_DATAPOOL_OPS`` to your
 Programs
 ########
 
-- ``earthdata.py`` - `line-oriented command interpreter for searching NSIDC databases and retrieving data <https://github.com/tsutterley/nsidc-earthdata/blob/master/doc/source/user_guide/earthdata.md>`_
+- ``nsidc_earthdata.py`` - `line-oriented command interpreter for searching NSIDC databases and retrieving data <https://github.com/tsutterley/nsidc-earthdata/blob/master/doc/source/user_guide/earthdata.md>`_
 
 Dependencies
 ############
