@@ -1,5 +1,5 @@
-earthdata.py
-============
+api.py
+======
 
 #### Calling Sequence
 ```

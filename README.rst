@@ -5,8 +5,6 @@ nsidc-earthdata
 |Language|
 |License|
 |Documentation Status|
-|Binder|
-|Pangeo|
 
 .. |Language| image:: https://img.shields.io/badge/python-v3.8-green.svg
    :target: https://www.python.org/
@@ -16,12 +14,6 @@ nsidc-earthdata
 
 .. |Documentation Status| image:: https://readthedocs.org/projects/nsidc-earthdata/badge/?version=latest
    :target: https://nsidc-earthdata.readthedocs.io/en/latest/?badge=latest
-
-.. |Binder| image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/tsutterley/nsidc-earthdata/master
-
-.. |Pangeo| image:: https://binder.pangeo.io/badge.svg
-   :target: https://binder.pangeo.io/v2/gh/tsutterley/nsidc-earthdata/master
 
 ftp-like program for searching NSIDC databases and retrieving NASA Operation IceBridge data
 
