@@ -639,7 +639,7 @@ class api(cmd.Cmd):
 if __name__ == '__main__':
     # run Earthdata program
     # ftp-like program for searching NSIDC databases and retrieving data
-    prompt = earthdata()
+    prompt = api()
     # print introductory message
     # run program until exit or keyboard interrupt
     prompt.cmdloop(prompt.intro)
